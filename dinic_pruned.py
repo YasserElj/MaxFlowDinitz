@@ -11,13 +11,16 @@ class Edge:
         self.rev = rev
 
 class Graph:
-    def __init__(self, V):
-        self.adj = [[] for i in range(V)]
+    def __init__(self, V, visualize=True, output_dir='dfs_paths_pruned'):
+        self.adj = [[] for _ in range(V)]
         self.V = V
-        self.level = [0 for i in range(V)]
+        self.level = [0] * V
         self.pos = None
         self.iteration = 1
         self.current_path = []
+        self.visualize = visualize
+        self.blocked = [False] * V  # For pruning
+        self.output_dir = output_dir
 
     def addEdge(self, u, v, C):
         a = Edge(v, 0, C, len(self.adj[v]))
@@ -26,13 +29,17 @@ class Graph:
         self.adj[v].append(b)
 
     def draw_graph_with_path(self):
-        if not os.path.exists("dfs_paths"):
-            os.makedirs("dfs_paths")
+        if not self.visualize:
+            return
+
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
         G = nx.DiGraph()
         path_edges = []
         saturated_edges = []
         available_edges = []
+        blocked_edges = []
 
         # Create edges and classify them
         for u in range(self.V):
@@ -41,6 +48,8 @@ class Graph:
                     G.add_edge(u, e.v, capacity=e.C, flow=e.flow)
                     if e.flow == e.C:
                         saturated_edges.append((u, e.v))
+                    elif self.blocked[u]:
+                        blocked_edges.append((u, e.v))
                     else:
                         available_edges.append((u, e.v))
 
@@ -54,7 +63,7 @@ class Graph:
 
         edge_labels = {(u, v): f"{d['flow']}/{d['capacity']}" for u, v, d in G.edges(data=True)}
         
-        # Color nodes based on their level
+        # Color nodes based on their level and blocked status
         node_colors = []
         for n in G.nodes():
             if n == 0:  # source
@@ -63,6 +72,8 @@ class Graph:
                 node_colors.append('lightcoral')
             elif self.level[n] == -1:
                 node_colors.append('lightgray')  # unreachable nodes
+            elif self.blocked[n]:
+                node_colors.append('purple')  # blocked nodes
             else:
                 # Create a color gradient based on level
                 intensity = max(0.2, 1 - (self.level[n] / (self.V * 0.8)))
@@ -76,6 +87,9 @@ class Graph:
         # Draw saturated edges
         nx.draw_networkx_edges(G, self.pos, edgelist=saturated_edges, edge_color='red', width=2)
         
+        # Draw blocked edges
+        nx.draw_networkx_edges(G, self.pos, edgelist=blocked_edges, edge_color='purple', width=2, style='dashed')
+
         # Draw current path
         nx.draw_networkx_edges(G, self.pos, edgelist=path_edges, edge_color='blue', width=3)
 
@@ -92,8 +106,10 @@ class Graph:
             Patch(facecolor='lightcoral', label='Sink'),
             Patch(facecolor='lightblue', label='Intermediate Node'),
             Patch(facecolor='lightgray', label='Unreachable Node'),
+            Patch(facecolor='purple', label='Blocked Node'),
             Patch(facecolor='white', edgecolor='gray', label='Available Edge'),
             Patch(facecolor='red', label='Saturated Edge'),
+            Patch(facecolor='purple', label='Blocked Edge', edgecolor='purple', hatch='///'),
             Patch(facecolor='blue', label='Current Path')
         ]
         
@@ -111,13 +127,13 @@ class Graph:
         plt.tight_layout()
         plt.subplots_adjust(right=0.85)
         
-        plt.savefig(f"dfs_paths/path{self.iteration}.png", bbox_inches='tight', dpi=300)
+        plt.savefig(f"{self.output_dir}/path{self.iteration}.png", bbox_inches='tight', dpi=300)
         plt.close()
         self.iteration += 1
 
     def BFS(self, s, t):
-        for i in range(self.V):
-            self.level[i] = -1
+        self.level = [-1] * self.V
+        self.blocked = [False] * self.V  # Reset blocked nodes
         self.level[s] = 0
         q = [s]
         while q:
@@ -126,76 +142,51 @@ class Graph:
                 if self.level[e.v] < 0 and e.flow < e.C:
                     self.level[e.v] = self.level[u] + 1
                     q.append(e.v)
-        return False if self.level[t] < 0 else True
+        return self.level[t] >= 0
 
-    def DFS(self, u, flow, t, start):
-        self.current_path.append(u)
-        
+    def DFS(self, u, flow, t, start, visualize):
         if u == t:
-            self.draw_graph_with_path()
+            if visualize == True:
+                self.draw_graph_with_path()
             return flow
-            
+        if self.blocked[u]:
+            return 0
+
+        self.current_path.append(u)
         while start[u] < len(self.adj[u]):
             e = self.adj[u][start[u]]
             if self.level[e.v] == self.level[u] + 1 and e.flow < e.C:
                 curr_flow = min(flow, e.C - e.flow)
-                temp_flow = self.DFS(e.v, curr_flow, t, start)
+                temp_flow = self.DFS(e.v, curr_flow, t, start,visualize)
                 if temp_flow > 0:
                     e.flow += temp_flow
                     self.adj[e.v][e.rev].flow -= temp_flow
+                    self.current_path.pop()
                     return temp_flow
             start[u] += 1
-        
+
+        self.blocked[u] = True  # Prune this node
         self.current_path.pop()
         return 0
 
-    def DinicMaxflow(self, s, t):
+    def DinicMaxflow(self, s, t, visualize):
         if s == t:
             return -1
         total = 0
         while self.BFS(s, t):
-            start = [0] * (self.V + 1)
+            start = [0] * self.V
             self.current_path = []
-            while True:
-                flow = self.DFS(s, float('inf'), t, start)
-                if flow == 0:
-                    break
+            flow = self.DFS(s, float('inf'), t, start,visualize)
+            while flow:
                 total += flow
+                flow = self.DFS(s, float('inf'), t, start, visualize)
                 self.current_path = []
         return total
 
-# Example usage with a complex graph
-g = Graph(10)  # 10 nodes (0-9)
-
-# Layer 1: Source connections
-g.addEdge(0, 1, 20)
-g.addEdge(0, 2, 15)
-g.addEdge(0, 3, 18)
-
-# Layer 2: Intermediate connections
-g.addEdge(1, 4, 12)
-g.addEdge(1, 5, 10)
-g.addEdge(2, 4, 8)
-g.addEdge(2, 5, 14)
-g.addEdge(2, 6, 11)
-g.addEdge(3, 5, 9)
-g.addEdge(3, 6, 16)
-
-# Cross connections
-g.addEdge(4, 5, 7)
-g.addEdge(5, 6, 8)
-g.addEdge(4, 7, 13)
-g.addEdge(5, 7, 15)
-g.addEdge(5, 8, 12)
-g.addEdge(6, 8, 10)
-
-# Layer 3: Pre-sink connections
-g.addEdge(7, 9, 25)
-g.addEdge(8, 9, 20)
-
-# Backward edges
-g.addEdge(5, 4, 6)
-g.addEdge(6, 5, 5)
-g.addEdge(8, 7, 4)
-
-print("Maximum flow:", g.DinicMaxflow(0, 9))
+def run_dinic(V, edges, s, t, visualize=True, draw = True):
+    g = Graph(V, visualize=visualize, output_dir='dfs_paths_pruned')
+    for u, v, C in edges:
+        g.addEdge(u, v, C)
+    max_flow = g.DinicMaxflow(s, t, visualize)
+    print("Maximum flow (Pruned):", max_flow)
+    return max_flow
