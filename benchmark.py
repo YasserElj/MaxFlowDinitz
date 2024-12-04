@@ -54,8 +54,8 @@ def benchmark():
     }
 
     # Define the graph parameters
-    num_nodes = 10000     # Number of nodes (adjust as needed)
-    num_edges = 100000   # Number of edges (adjust as needed)
+    num_nodes = 10000     # Number of nodes (adjust as needed) 100000
+    num_edges = 100000   # Number of edges (adjust as needed) 1000000
     s = 0                 # Source node
     t = num_nodes - 1     # Sink node
 
@@ -67,7 +67,7 @@ def benchmark():
     for name, module in versions.items():
         print(f"Running {name} version...")
         start_time = time.perf_counter()
-        max_flow = module.run_dinic(num_nodes, edges, s, t, visualize=False)  # Disable visualization during timing
+        max_flow = module.run_dinic(num_nodes, edges, s, t, visualize=True)  # Disable visualization during timing
         end_time = time.perf_counter()
         algorithm_time = end_time - start_time
 
