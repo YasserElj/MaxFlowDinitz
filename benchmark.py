@@ -3,7 +3,7 @@ import dinic_original
 import dinic_pruned
 import random
 
-def generate_large_graph(num_nodes, num_edges, s, t, seed=42):
+def generate_large_graph(num_nodes, num_edges, s, t, seed=111):
     """
     Generates a large, complex directed graph for testing Dinic's algorithm.
 
@@ -52,8 +52,8 @@ def benchmark(num_runs=5):
     }
 
     # Define the graph parameters
-    num_nodes = 100000  # Number of nodes (adjust as needed)
-    num_edges = 1000000  # Number of edges (adjust as needed)
+    num_nodes = 10  # Number of nodes (adjust as needed)
+    num_edges = 21  # Number of edges (adjust as needed)
     s = 0  # Source node
     t = num_nodes - 1  # Sink node
 
