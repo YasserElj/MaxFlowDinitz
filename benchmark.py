@@ -1,5 +1,3 @@
-# benchmark.py
-
 import time
 import dinic_original
 import dinic_pruned
@@ -47,17 +45,17 @@ def generate_large_graph(num_nodes, num_edges, s, t, seed=42):
 
     return edges
 
-def benchmark():
+def benchmark(num_runs=5):
     versions = {
         "Original": dinic_original,
         "Pruned": dinic_pruned,
     }
 
     # Define the graph parameters
-    num_nodes = 10000     # Number of nodes (adjust as needed) 100000
-    num_edges = 100000   # Number of edges (adjust as needed) 1000000
-    s = 0                 # Source node
-    t = num_nodes - 1     # Sink node
+    num_nodes = 100000  # Number of nodes (adjust as needed)
+    num_edges = 1000000  # Number of edges (adjust as needed)
+    s = 0  # Source node
+    t = num_nodes - 1  # Sink node
 
     # Generate the large, complex graph
     edges = generate_large_graph(num_nodes, num_edges, s, t)
@@ -65,17 +63,19 @@ def benchmark():
     print(f"Generated a graph with {num_nodes} nodes and {num_edges} edges.\n")
 
     for name, module in versions.items():
-        print(f"Running {name} version...")
-        start_time = time.perf_counter()
-        max_flow = module.run_dinic(num_nodes, edges, s, t, visualize=True)  # Disable visualization during timing
-        end_time = time.perf_counter()
-        algorithm_time = end_time - start_time
+        print(f"Running {name} version...\n")
+        times = []
 
-        # Now generate plots (not included in timing)
-        module.run_dinic(num_nodes, edges, s, t, visualize=False)
+        for run in range(num_runs):
+            print(f"Run {run + 1}/{num_runs}...")
+            start_time = time.perf_counter()
+            max_flow = module.run_dinic(num_nodes, edges, s, t, visualize=False)  # Disable visualization during timing
+            end_time = time.perf_counter()
+            times.append(end_time - start_time)
 
+        avg_time = sum(times) / num_runs
         print(f"{name} version: Maximum flow = {max_flow}")
-        print(f"{name} version took {algorithm_time:.6f} seconds (algorithm only)\n")
+        print(f"{name} version average time over {num_runs} runs: {avg_time:.6f} seconds (algorithm only)\n")
 
 if __name__ == "__main__":
     benchmark()
